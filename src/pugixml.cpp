@@ -5319,6 +5319,14 @@ namespace pugi
 	}
 #endif
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute& xml_attribute::operator=(string_view_t rhs)
+	{
+		set_value(rhs);
+		return *this;
+	}
+#endif
+
 	PUGI__FN bool xml_attribute::set_name(const char_t* rhs)
 	{
 		if (!_attr) return false;
@@ -5326,12 +5334,30 @@ namespace pugi
 		return impl::strcpy_insitu(_attr->name, _attr->header, impl::xml_memory_page_name_allocated_mask, rhs, impl::strlength(rhs));
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_attribute::set_name(string_view_t rhs)
+	{
+		if (!_attr) return false;
+
+		return impl::strcpy_insitu(_attr->name, _attr->header, impl::xml_memory_page_name_allocated_mask, rhs.data(), rhs.size());
+	}
+#endif
+
 	PUGI__FN bool xml_attribute::set_value(const char_t* rhs)
 	{
 		if (!_attr) return false;
 
 		return impl::strcpy_insitu(_attr->value, _attr->header, impl::xml_memory_page_value_allocated_mask, rhs, impl::strlength(rhs));
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_attribute::set_value(string_view_t rhs)
+	{
+		if (!_attr) return false;
+
+		return impl::strcpy_insitu(_attr->value, _attr->header, impl::xml_memory_page_value_allocated_mask, rhs.data(), rhs.size());
+	}
+#endif
 
 	PUGI__FN bool xml_attribute::set_value(int rhs)
 	{
@@ -5541,6 +5567,18 @@ namespace pugi
 		return xml_node();
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::child(string_view_t name_) const
+	{
+		if (!_root) return xml_node();
+
+		for (xml_node_struct* i = _root->first_child; i; i = i->next_sibling)
+			if (i->name && name_ == i->name) return xml_node(i);
+
+		return xml_node();
+	}
+#endif
+
 	PUGI__FN xml_attribute xml_node::attribute(const char_t* name_) const
 	{
 		if (!_root) return xml_attribute();
@@ -5552,6 +5590,19 @@ namespace pugi
 		return xml_attribute();
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::attribute(string_view_t name_) const
+	{
+		if (!_root) return xml_attribute();
+
+		for (xml_attribute_struct* i = _root->first_attribute; i; i = i->next_attribute)
+			if (i->name && name_ == i->name)
+				return xml_attribute(i);
+
+		return xml_attribute();
+	}
+#endif
+
 	PUGI__FN xml_node xml_node::next_sibling(const char_t* name_) const
 	{
 		if (!_root) return xml_node();
@@ -5561,6 +5612,18 @@ namespace pugi
 
 		return xml_node();
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::next_sibling(string_view_t name_) const
+	{
+		if (!_root) return xml_node();
+
+		for (xml_node_struct* i = _root->next_sibling; i; i = i->next_sibling)
+			if (i->name && name_ == i->name) return xml_node(i);
+
+		return xml_node();
+	}
+#endif
 
 	PUGI__FN xml_node xml_node::next_sibling() const
 	{
@@ -5576,6 +5639,18 @@ namespace pugi
 
 		return xml_node();
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::previous_sibling(string_view_t name_) const
+	{
+		if (!_root) return xml_node();
+
+		for (xml_node_struct* i = _root->prev_sibling_c; i->next_sibling; i = i->prev_sibling_c)
+			if (i->name && name_ == i->name) return xml_node(i);
+
+		return xml_node();
+	}
+#endif
 
 	PUGI__FN xml_attribute xml_node::attribute(const char_t* name_, xml_attribute& hint_) const
 	{
@@ -5609,6 +5684,41 @@ namespace pugi
 
 		return xml_attribute();
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::attribute(string_view_t name_, xml_attribute& hint_) const
+	{
+		xml_attribute_struct* hint = hint_._attr;
+
+		// if hint is not an attribute of node, behavior is not defined
+		assert(!hint || (_root && impl::is_attribute_of(hint, _root)));
+
+		if (!_root) return xml_attribute();
+
+		// optimistically search from hint up until the end
+		for (xml_attribute_struct* i = hint; i; i = i->next_attribute)
+			if (i->name && name_ == i->name)
+			{
+				// update hint to maximize efficiency of searching for consecutive attributes
+				hint_._attr = i->next_attribute;
+
+				return xml_attribute(i);
+			}
+
+		// wrap around and search from the first attribute until the hint
+		// 'j' null pointer check is technically redundant, but it prevents a crash in case the assertion above fails
+		for (xml_attribute_struct* j = _root->first_attribute; j && j != hint; j = j->next_attribute)
+			if (j->name && name_ == j->name)
+			{
+				// update hint to maximize efficiency of searching for consecutive attributes
+				hint_._attr = j->next_attribute;
+
+				return xml_attribute(j);
+			}
+
+		return xml_attribute();
+	}
+#endif
 
 	PUGI__FN xml_node xml_node::previous_sibling() const
 	{
@@ -5653,6 +5763,13 @@ namespace pugi
 		return child(name_).child_value();
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN const char_t* xml_node::child_value(string_view_t name_) const
+	{
+		return child(name_).child_value();
+	}
+#endif
+
 	PUGI__FN xml_attribute xml_node::first_attribute() const
 	{
 		return _root ? xml_attribute(_root->first_attribute) : xml_attribute();
@@ -5683,6 +5800,18 @@ namespace pugi
 		return impl::strcpy_insitu(_root->name, _root->header, impl::xml_memory_page_name_allocated_mask, rhs, impl::strlength(rhs));
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_node::set_name(string_view_t rhs)
+	{
+		xml_node_type type_ = _root ? PUGI__NODETYPE(_root) : node_null;
+
+		if (type_ != node_element && type_ != node_pi && type_ != node_declaration)
+			return false;
+
+		return impl::strcpy_insitu(_root->name, _root->header, impl::xml_memory_page_name_allocated_mask, rhs.data(), rhs.size());
+	}
+#endif
+
 	PUGI__FN bool xml_node::set_value(const char_t* rhs)
 	{
 		xml_node_type type_ = _root ? PUGI__NODETYPE(_root) : node_null;
@@ -5692,6 +5821,18 @@ namespace pugi
 
 		return impl::strcpy_insitu(_root->value, _root->header, impl::xml_memory_page_value_allocated_mask, rhs, impl::strlength(rhs));
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_node::set_value(string_view_t rhs)
+	{
+		xml_node_type type_ = _root ? PUGI__NODETYPE(_root) : node_null;
+
+		if (type_ != node_pcdata && type_ != node_cdata && type_ != node_comment && type_ != node_pi && type_ != node_doctype)
+			return false;
+
+		return impl::strcpy_insitu(_root->value, _root->header, impl::xml_memory_page_value_allocated_mask, rhs.data(), rhs.size());
+	}
+#endif
 
 	PUGI__FN xml_attribute xml_node::append_attribute(const char_t* name_)
 	{
@@ -5710,6 +5851,25 @@ namespace pugi
 		return a;
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::append_attribute(string_view_t name_)
+	{
+		if (!impl::allow_insert_attribute(type())) return xml_attribute();
+
+		impl::xml_allocator& alloc = impl::get_allocator(_root);
+		if (!alloc.reserve()) return xml_attribute();
+
+		xml_attribute a(impl::allocate_attribute(alloc));
+		if (!a) return xml_attribute();
+
+		impl::append_attribute(a._attr, _root);
+
+		a.set_name(name_);
+
+		return a;
+	}
+#endif
+
 	PUGI__FN xml_attribute xml_node::prepend_attribute(const char_t* name_)
 	{
 		if (!impl::allow_insert_attribute(type())) return xml_attribute();
@@ -5726,6 +5886,25 @@ namespace pugi
 
 		return a;
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::prepend_attribute(string_view_t name_)
+	{
+		if (!impl::allow_insert_attribute(type())) return xml_attribute();
+
+		impl::xml_allocator& alloc = impl::get_allocator(_root);
+		if (!alloc.reserve()) return xml_attribute();
+
+		xml_attribute a(impl::allocate_attribute(alloc));
+		if (!a) return xml_attribute();
+
+		impl::prepend_attribute(a._attr, _root);
+
+		a.set_name(name_);
+
+		return a;
+	}
+#endif
 
 	PUGI__FN xml_attribute xml_node::insert_attribute_after(const char_t* name_, const xml_attribute& attr)
 	{
@@ -5745,6 +5924,26 @@ namespace pugi
 		return a;
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::insert_attribute_after(string_view_t name_, const xml_attribute& attr)
+	{
+		if (!impl::allow_insert_attribute(type())) return xml_attribute();
+		if (!attr || !impl::is_attribute_of(attr._attr, _root)) return xml_attribute();
+
+		impl::xml_allocator& alloc = impl::get_allocator(_root);
+		if (!alloc.reserve()) return xml_attribute();
+
+		xml_attribute a(impl::allocate_attribute(alloc));
+		if (!a) return xml_attribute();
+
+		impl::insert_attribute_after(a._attr, attr._attr, _root);
+
+		a.set_name(name_);
+
+		return a;
+	}
+#endif
+
 	PUGI__FN xml_attribute xml_node::insert_attribute_before(const char_t* name_, const xml_attribute& attr)
 	{
 		if (!impl::allow_insert_attribute(type())) return xml_attribute();
@@ -5762,6 +5961,26 @@ namespace pugi
 
 		return a;
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_attribute xml_node::insert_attribute_before(string_view_t name_, const xml_attribute& attr)
+	{
+		if (!impl::allow_insert_attribute(type())) return xml_attribute();
+		if (!attr || !impl::is_attribute_of(attr._attr, _root)) return xml_attribute();
+
+		impl::xml_allocator& alloc = impl::get_allocator(_root);
+		if (!alloc.reserve()) return xml_attribute();
+
+		xml_attribute a(impl::allocate_attribute(alloc));
+		if (!a) return xml_attribute();
+
+		impl::insert_attribute_before(a._attr, attr._attr, _root);
+
+		a.set_name(name_);
+
+		return a;
+	}
+#endif
 
 	PUGI__FN xml_attribute xml_node::append_copy(const xml_attribute& proto)
 	{
@@ -5912,6 +6131,17 @@ namespace pugi
 		return result;
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::append_child(string_view_t name_)
+	{
+		xml_node result = append_child(node_element);
+
+		result.set_name(name_);
+
+		return result;
+	}
+#endif
+
 	PUGI__FN xml_node xml_node::prepend_child(const char_t* name_)
 	{
 		xml_node result = prepend_child(node_element);
@@ -5920,6 +6150,17 @@ namespace pugi
 
 		return result;
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::prepend_child(string_view_t name_)
+	{
+		xml_node result = prepend_child(node_element);
+
+		result.set_name(name_);
+
+		return result;
+	}
+#endif
 
 	PUGI__FN xml_node xml_node::insert_child_after(const char_t* name_, const xml_node& node)
 	{
@@ -5930,6 +6171,17 @@ namespace pugi
 		return result;
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::insert_child_after(string_view_t name_, const xml_node& node)
+	{
+		xml_node result = insert_child_after(node_element, node);
+
+		result.set_name(name_);
+
+		return result;
+	}
+#endif
+
 	PUGI__FN xml_node xml_node::insert_child_before(const char_t* name_, const xml_node& node)
 	{
 		xml_node result = insert_child_before(node_element, node);
@@ -5938,6 +6190,17 @@ namespace pugi
 
 		return result;
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::insert_child_before(string_view_t name_, const xml_node& node)
+	{
+		xml_node result = insert_child_before(node_element, node);
+
+		result.set_name(name_);
+
+		return result;
+	}
+#endif
 
 	PUGI__FN xml_node xml_node::append_copy(const xml_node& proto)
 	{
@@ -6082,6 +6345,13 @@ namespace pugi
 		return remove_attribute(attribute(name_));
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_node::remove_attribute(string_view_t name_)
+	{
+		return remove_attribute(attribute(name_));
+	}
+#endif
+
 	PUGI__FN bool xml_node::remove_attribute(const xml_attribute& a)
 	{
 		if (!_root || !a._attr) return false;
@@ -6121,6 +6391,13 @@ namespace pugi
 	{
 		return remove_child(child(name_));
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_node::remove_child(string_view_t name_)
+	{
+		return remove_child(child(name_));
+	}
+#endif
 
 	PUGI__FN bool xml_node::remove_child(const xml_node& n)
 	{
@@ -6206,6 +6483,23 @@ namespace pugi
 		return xml_node();
 	}
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::find_child_by_attribute(string_view_t name_, string_view_t attr_name, string_view_t attr_value) const
+	{
+		if (!_root) return xml_node();
+
+		for (xml_node_struct* i = _root->first_child; i; i = i->next_sibling)
+			if (i->name && name_ == i->name)
+			{
+				for (xml_attribute_struct* a = i->first_attribute; a; a = a->next_attribute)
+					if (a->name && attr_name == a->name && attr_value == (a->value ? a->value + 0 : PUGIXML_TEXT("")))
+						return xml_node(i);
+			}
+
+		return xml_node();
+	}
+#endif
+
 	PUGI__FN xml_node xml_node::find_child_by_attribute(const char_t* attr_name, const char_t* attr_value) const
 	{
 		if (!_root) return xml_node();
@@ -6217,6 +6511,20 @@ namespace pugi
 
 		return xml_node();
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_node xml_node::find_child_by_attribute(string_view_t attr_name, string_view_t attr_value) const
+	{
+		if (!_root) return xml_node();
+
+		for (xml_node_struct* i = _root->first_child; i; i = i->next_sibling)
+			for (xml_attribute_struct* a = i->first_attribute; a; a = a->next_attribute)
+				if (a->name && attr_name == a->name && attr_value == (a->value ? a->value + 0 : PUGIXML_TEXT("")))
+					return xml_node(i);
+
+		return xml_node();
+	}
+#endif
 
 #ifndef PUGIXML_NO_STL
 	PUGI__FN string_t xml_node::path(char_t delimiter) const
@@ -6622,6 +6930,15 @@ namespace pugi
 	}
 #endif
 
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN bool xml_text::set(string_view_t rhs)
+	{
+		xml_node_struct* dn = _data_new();
+
+		return dn ? impl::strcpy_insitu(dn->value, dn->header, impl::xml_memory_page_value_allocated_mask, rhs.data(), rhs.size()) : false;
+	}
+#endif
+
 	PUGI__FN xml_text& xml_text::operator=(const char_t* rhs)
 	{
 		set(rhs);
@@ -6678,6 +6995,14 @@ namespace pugi
 	}
 
 	PUGI__FN xml_text& xml_text::operator=(unsigned long long rhs)
+	{
+		set(rhs);
+		return *this;
+	}
+#endif
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_text& xml_text::operator=(string_view_t rhs)
 	{
 		set(rhs);
 		return *this;
@@ -7191,6 +7516,20 @@ namespace pugi
 
 		return load_buffer(contents, impl::strlength(contents) * sizeof(char_t), options, encoding);
 	}
+
+#ifdef PUGIXML_HAS_STRING_VIEW
+	PUGI__FN xml_parse_result xml_document::load_string(string_view_t contents, unsigned int options)
+	{
+		// Force native encoding (skip autodetection)
+	#ifdef PUGIXML_WCHAR_MODE
+		xml_encoding encoding = encoding_wchar;
+	#else
+		xml_encoding encoding = encoding_utf8;
+	#endif
+
+		return load_buffer(contents.data(), contents.size(), options, encoding);
+	}
+#endif
 
 	PUGI__FN xml_parse_result xml_document::load(const char_t* contents, unsigned int options)
 	{
